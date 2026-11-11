@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calculatrice</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; background:#111; font-family: system-ui, sans-serif; }
+  .calc { width:min(92vw,340px); background:#1c1c1e; border-radius:24px; padding:16px; box-shadow:0 10px 40px #0008; }
+  .screen { color:#fff; text-align:right; font-size:48px; padding:20px 10px 12px; min-height:84px; overflow:hidden; white-space:nowrap; }
+  .expr { color:#888; font-size:16px; min-height:20px; text-align:right; padding:0 10px; overflow:hidden; white-space:nowrap; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  button { border:0; border-radius:50%; aspect-ratio:1; font-size:26px; color:#fff; background:#333; cursor:pointer; }
+  button:active { filter:brightness(1.4); }
+  .fn { background:#a5a5a5; color:#000; }
+  .op { background:#ff9f0a; }
+  .zero { grid-column:span 2; border-radius:40px; aspect-ratio:auto; text-align:left; padding-left:28px; }
+</style>
+</head>
+<body>
+<div class="calc">
+  <div class="expr" id="expr"></div>
+  <div class="screen" id="screen">0</div>
+  <div class="grid" id="grid">
+    <button class="fn" data-k="C">C</button>
+    <button class="fn" data-k="±">±</button>
+    <button class="fn" data-k="%">%</button>
+    <button class="op" data-k="/">÷</button>
+    <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+    <button class="op" data-k="*">×</button>
+    <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+    <button class="op" data-k="-">−</button>
+    <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+    <button class="op" data-k="+">+</button>
+    <button class="zero" data-k="0">0</button>
+    <button data-k=".">,</button>
+    <button class="op" data-k="=">=</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const screen = document.getElementById('screen');
+  const exprEl = document.getElementById('expr');
+  let cur = '0', prev = null, op = null, fresh = false;
+  let zeros = 0;
+
+  const fmt = s => String(s).replace('.', ',');
+  const show = () => { screen.textContent = fmt(cur); };
+  const sym = { '/':'÷', '*':'×', '-':'−', '+':'+' };
+
+  function calc(a, b, o) {
+    a = parseFloat(a); b = parseFloat(b);
+    let r = o === '+' ? a + b : o === '-' ? a - b : o === '*' ? a * b : (b === 0 ? NaN : a / b);
+    if (!isFinite(r)) return 'Erreur';
+    return String(parseFloat(r.toPrecision(12)));
+  }
+
+  function press(k) {
+    // easter egg : 4 fois "0" d'affilée
+    if (k === '0') { zeros++; if (zeros >= 4) { zeros = 0; openChat(); } }
+    else zeros = 0;
+
+    if (cur === 'Erreur' && k !== 'C') cur = '0';
+    if (/^[0-9]$/.test(k)) {
+      if (fresh) { cur = '0'; fresh = false; }
+      cur = cur === '0' ? k : (cur.replace(/[-.]/g,'').length < 12 ? cur + k : cur);
+    } else if (k === '.') {
+      if (fresh) { cur = '0'; fresh = false; }
+      if (!cur.includes('.')) cur += '.';
+    } else if (k === 'C') {
+      cur = '0'; prev = null; op = null; fresh = false; exprEl.textContent = '';
+    } else if (k === '±') {
+      if (cur !== '0') cur = cur.startsWith('-') ? cur.slice(1) : '-' + cur;
+    } else if (k === '%') {
+      cur = String(parseFloat(cur) / 100);
+    } else if (['+','-','*','/'].includes(k)) {
+      if (op && !fresh) { cur = calc(prev, cur, op); }
+      prev = cur; op = k; fresh = true;
+      exprEl.textContent = fmt(prev) + ' ' + sym[k];
+    } else if (k === '=') {
+      if (op) {
+        exprEl.textContent = fmt(prev) + ' ' + sym[op] + ' ' + fmt(cur) + ' =';
+        cur = calc(prev, cur, op); prev = null; op = null; fresh = true;
+      }
+    }
+    show();
+  }
+
+  function openChat() {
+    // l'ouverture doit se faire dans le geste utilisateur
+    const w = window.open('about:blank', '_blank');
+    if (!w) return;
+    fetch('chat.html', { cache: 'no-store' })
+      .then(r => r.text())
+      .then(html => { w.document.open(); w.document.write(html); w.document.close(); })
+      .catch(() => w.close());
+  }
+
+  document.getElementById('grid').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (b) press(b.dataset.k);
+  });
+  document.addEventListener('keydown', e => {
+    if (/^[0-9.]$/.test(e.key)) press(e.key);
+    else if (e.key === ',') press('.');
+    else if (['+','-','*','/'].includes(e.key)) press(e.key);
+    else if (e.key === 'Enter' || e.key === '=') press('=');
+    else if (e.key === 'Escape' || e.key === 'Delete') press('C');
+    else if (e.key === '%') press('%');
+  });
+})();
+</script>
+</body>
+</html>
